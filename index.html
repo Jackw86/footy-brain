@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <title>Footy Brain — Train Your Football Brain</title>
+  <link rel="manifest" href="/manifest.json"/>
+  <meta name="theme-color" content="#080f1e"/>
+  <meta name="application-name" content="Footy Brain"/>
+  <meta name="apple-mobile-web-app-title" content="Footy Brain"/>
+  <meta name="description" content="Train your football brain! Quizzes, mini-games and tactics for young footballers aged 8-12."/>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600;700;900&display=swap" rel="stylesheet"/>
+
+  <!-- Tailwind (utility classes for rapid layout) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+  <style>
+    /* ── DESIGN TOKENS ─────────────────────────────── */
+    :root {
+      --bg:       #080f1e;
+      --bg2:      #0d1628;
+      --card:     #111c35;
+      --card2:    #162040;
+      --border:   #1e2f55;
+      --text:     #e8edf8;
+      --text2:    #6b7fa3;
+      --green:    #00e87a;
+      --green-d:  #00b85f;
+      --green-glow: rgba(0,232,122,.2);
+      --orange:   #ff8c00;
+      --blue:     #38bdf8;
+      --purple:   #a78bfa;
+      --red:      #f87171;
+      --r:        16px;
+      --font-body:'Outfit', sans-serif;
+      --font-head:'Bebas Neue', sans-serif;
+    }
+    [data-theme="light"] {
+      --bg:     #f0f4f8;
+      --bg2:    #e4ecf4;
+      --card:   #ffffff;
+      --card2:  #f4f8fc;
+      --border: #d0dcea;
+      --text:   #0d1628;
+      --text2:  #5a6f90;
+      --green:  #00a854;
+      --green-d:#007a3d;
+      --green-glow: rgba(0,168,84,.15);
+    }
+
+    /* ── RESET & BASE ──────────────────────────────── */
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+    html { height:100%; overflow:hidden; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      height: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Animated pitch background */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background:
+        repeating-linear-gradient(
+          0deg,
+          transparent 0px, transparent 58px,
+          rgba(255,255,255,.025) 58px, rgba(255,255,255,.025) 59px
+        ),
+        repeating-linear-gradient(
+          90deg,
+          transparent 0px, transparent 58px,
+          rgba(255,255,255,.015) 58px, rgba(255,255,255,.015) 59px
+        );
+      animation: pitchScroll 40s linear infinite;
+      pointer-events: none;
+    }
+    @keyframes pitchScroll {
+      from { background-position: 0 0, 0 0; }
+      to   { background-position: 0 120px, 0 0; }
+    }
+
+    /* Floodlight glow */
+    body::after {
+      content: '';
+      position: fixed; top: -120px; left: 50%; transform: translateX(-50%);
+      width: 600px; height: 300px; border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(0,232,122,.06) 0%, transparent 70%);
+      z-index: 0; pointer-events: none;
+    }
+
+    /* ── LAYOUT ─────────────────────────────────────── */
+    #app {
+      position: relative; z-index: 1;
+      height: 100vh;
+      overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+
+    .screen {
+      position: absolute; inset: 0;
+      overflow-y: auto; overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 80px;
+    }
+
+    .screen.hidden { display: none !important; }
+
+    /* Screens without nav don't need bottom padding */
+    #name-screen,
+    #position-screen { padding-bottom: 0; }
+
+    /* ── TYPOGRAPHY ─────────────────────────────────── */
+    h1, h2, h3,
+    .font-display { font-family: var(--font-head); letter-spacing: .04em; }
+
+    /* ── CARDS ──────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 1.1rem;
+    }
+    .card2 {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: .85rem;
+    }
+
+    /* ── BUTTONS ────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+      padding: .75rem 1.4rem; border-radius: var(--r);
+      font-family: var(--font-body); font-weight: 700; font-size: .95rem;
+      cursor: pointer; border: none; transition: all .14s ease;
+      text-decoration: none; line-height: 1;
+    }
+    .btn-green  { background: var(--green);  color: #000; }
+    .btn-green:hover  { filter: brightness(1.1); transform: scale(1.02); }
+    .btn-gray   { background: var(--card2);  color: var(--text); border: 1px solid var(--border); }
+    .btn-gray:hover   { background: var(--border); }
+    .btn-orange { background: var(--orange); color: #000; }
+    .btn-red    { background: var(--red);    color: #000; }
+    .btn-blue   { background: var(--blue);   color: #000; }
+
+    /* ── XP BAR ─────────────────────────────────────── */
+    .xp-bar {
+      height: 7px; border-radius: 99px;
+      background: var(--card2);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .xp-fill {
+      height: 100%; border-radius: 99px;
+      background: linear-gradient(90deg, var(--green), var(--blue));
+      transition: width .6s cubic-bezier(.34,1.56,.64,1);
+    }
+
+    /* ── QUIZ OPTIONS ───────────────────────────────── */
+    .quiz-opt {
+      width: 100%; padding: .85rem 1rem;
+      border-radius: 12px;
+      background: var(--card2); border: 2px solid var(--border);
+      color: var(--text); font-family: var(--font-body);
+      font-size: .9rem; text-align: left; cursor: pointer;
+      transition: border-color .12s, background .12s;
+      line-height: 1.4;
+    }
+    .quiz-opt:hover:not(:disabled) {
+      border-color: var(--green);
+      background: rgba(0,232,122,.07);
+    }
+    .quiz-opt.correct {
+      border-color: var(--green) !important;
+      background: rgba(0,232,122,.15) !important;
+    }
+    .quiz-opt.wrong {
+      border-color: var(--red) !important;
+      background: rgba(248,113,113,.15) !important;
+    }
+    .quiz-opt:disabled { cursor: not-allowed; opacity: .85; }
+
+    /* ── CHAPTER CARDS ──────────────────────────────── */
+    .chapter-card {
+      background: var(--card); border: 1.5px solid var(--border);
+      border-radius: 14px; padding: .9rem;
+      cursor: pointer; transition: border-color .15s, transform .15s, box-shadow .15s;
+    }
+    .chapter-card:hover {
+      border-color: var(--green);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 24px var(--green-glow);
+    }
+    .chapter-card.locked {
+      opacity: .45; cursor: not-allowed;
+      pointer-events: none;
+    }
+    .chapter-card.locked:hover { transform: none; box-shadow: none; }
+
+    /* ── BADGES ─────────────────────────────────────── */
+    .badge {
+      display: inline-flex; align-items: center; gap: .3rem;
+      padding: .2rem .65rem; border-radius: 99px;
+      font-size: .75rem; font-weight: 700;
+    }
+    .badge-green  { background: rgba(0,232,122,.12); color: var(--green); }
+    .badge-orange { background: rgba(255,140,0,.12);  color: var(--orange);}
+    .badge-blue   { background: rgba(56,189,248,.12); color: var(--blue); }
+    .badge-purple { background: rgba(167,139,250,.12);color: var(--purple);}
+    .badge-red    { background: rgba(248,113,113,.12);color: var(--red);  }
+
+    /* ── NAV BAR ─────────────────────────────────────── */
+    #main-nav {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      display: flex; justify-content: space-around;
+      padding: .6rem 0 calc(.6rem + env(safe-area-inset-bottom));
+      backdrop-filter: blur(12px);
+    }
+    #main-nav.hidden { display: none !important; }
+
+    #main-nav button {
+      background: none; border: none; color: var(--text2);
+      cursor: pointer; display: flex; flex-direction: column;
+      align-items: center; gap: .25rem;
+      font-size: .65rem; font-family: var(--font-body);
+      font-weight: 600; letter-spacing: .02em;
+      padding: 0 .5rem; transition: color .15s;
+      min-width: 48px;
+    }
+    #main-nav button:hover,
+    #main-nav button.active { color: var(--green); }
+    #main-nav button.active svg { filter: drop-shadow(0 0 6px var(--green-glow)); }
+    #main-nav button svg { width: 22px; height: 22px; stroke: currentColor; }
+
+    /* Nav active indicator */
+    #main-nav button.active::after {
+      content: '';
+      display: block; width: 4px; height: 4px; border-radius: 50%;
+      background: var(--green);
+      margin: 0 auto -2px;
+    }
+
+    /* ── TOGGLE SWITCH ──────────────────────────────── */
+    .toggle { position: relative; width: 48px; height: 26px; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0;
+      background: var(--border); border-radius: 99px;
+      cursor: pointer; transition: .25s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute;
+      height: 20px; width: 20px; left: 3px; top: 3px;
+      background: #fff; border-radius: 50%; transition: .25s;
+    }
+    input:checked + .toggle-slider { background: var(--green); }
+    input:checked + .toggle-slider::before { transform: translateX(22px); }
+
+    /* ── TOAST ──────────────────────────────────────── */
+    #toast {
+      position: fixed; top: 1.25rem; left: 50%;
+      transform: translateX(-50%);
+      background: var(--card); border: 1px solid var(--green);
+      color: var(--text); font-weight: 600; font-size: .875rem;
+      padding: .6rem 1.25rem; border-radius: 99px;
+      z-index: 300; opacity: 0; transition: opacity .25s;
+      pointer-events: none; white-space: nowrap;
+      box-shadow: 0 4px 20px rgba(0,232,122,.2);
+    }
+    #toast.show { opacity: 1; }
+
+    /* ── FLAME ANIMATION ────────────────────────────── */
+    @keyframes flicker {
+      0%,100% { transform: scale(1) rotate(-1deg); }
+      50%      { transform: scale(1.06) rotate(1deg); }
+    }
+    .flame { display: inline-block; animation: flicker 1.3s ease-in-out infinite; }
+
+    /* ── HEADER ─────────────────────────────────────── */
+    .app-header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: .75rem 1.1rem;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 50;
+    }
+
+    /* ── DAILY BANNER ───────────────────────────────── */
+    .daily-banner {
+      background: linear-gradient(135deg, rgba(0,232,122,.1), rgba(56,189,248,.08));
+      border: 1px solid rgba(0,232,122,.25);
+      border-radius: var(--r); padding: .85rem 1rem;
+      margin: .75rem 1.1rem 0;
+    }
+
+    /* ── GAME GRID ──────────────────────────────────── */
+    .game-card {
+      background: var(--card); border: 1.5px solid var(--border);
+      border-radius: 14px; padding: 1rem;
+      cursor: pointer; transition: all .15s;
+      display: flex; flex-direction: column; align-items: center;
+      gap: .4rem; text-align: center;
+    }
+    .game-card:hover {
+      border-color: var(--green);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 20px var(--green-glow);
+    }
+
+    /* ── POSITION CARDS ─────────────────────────────── */
+    .pos-card {
+      background: var(--card); border: 2.5px solid var(--border);
+      border-radius: 18px; padding: 1.25rem;
+      cursor: pointer; transition: all .18s; text-align: center;
+    }
+    .pos-card:hover { transform: scale(1.04); }
+    .pos-card.striker   { border-color: var(--orange); }
+    .pos-card.striker:hover   { box-shadow: 0 0 20px rgba(255,140,0,.3); }
+    .pos-card.midfielder{ border-color: var(--blue); }
+    .pos-card.midfielder:hover{ box-shadow: 0 0 20px rgba(56,189,248,.3); }
+    .pos-card.defender  { border-color: var(--purple); }
+    .pos-card.defender:hover  { box-shadow: 0 0 20px rgba(167,139,250,.3); }
+    .pos-card.goalkeeper{ border-color: var(--green); }
+    .pos-card.goalkeeper:hover{ box-shadow: 0 0 20px var(--green-glow); }
+    .pos-card.all-rounder{ border-color: var(--text2); }
+
+    /* ── RESPONSIVE MAX WIDTH ───────────────────────── */
+    .inner { max-width: 480px; margin: 0 auto; padding: 0 1.1rem; }
+  </style>
+  <!-- PWA Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .catch(() => {}); // Silently fail if not on HTTPS/localhost
+      });
+    }
+  </script>
+
+</head>
+<body>
+<div id="app">
+
+  <!-- ════════════════════════════════════════════
+       TOAST
+  ═══════════════════════════════════════════════ -->
+  <div id="toast"></div>
+
+  <!-- ════════════════════════════════════════════
+       NAME SCREEN
+  ═══════════════════════════════════════════════ -->
+  <div id="name-screen" class="screen">
+    <div style="min-height:100vh;display:flex;flex-direction:column;
+                align-items:center;justify-content:center;padding:2rem 1.5rem;">
+      <div style="max-width:380px;width:100%;text-align:center;">
+
+        <!-- Logo -->
+        <div style="margin-bottom:1.5rem;">
+          <div style="font-size:4.5rem;margin-bottom:.5rem;
+               filter:drop-shadow(0 0 20px rgba(0,232,122,.4));">🧠⚽</div>
+          <h1 style="font-size:3.8rem;line-height:.9;color:var(--green);
+               text-shadow:0 0 30px var(--green-glow);">FOOTY<br>BRAIN</h1>
+          <div style="font-family:var(--font-head);font-size:1.1rem;
+               color:var(--text2);letter-spacing:.15em;margin-top:.4rem;">FOOTBALL ACADEMY</div>
+        </div>
+
+        <p style="color:var(--text2);font-size:.9rem;margin-bottom:2rem;line-height:1.5;">
+          Train your football brain!<br>Quizzes, games & tactics for young players
+        </p>
+
+        <p style="font-weight:700;margin-bottom:.75rem;">What's your name, future star?</p>
+        <input id="player-name" type="text" placeholder="Enter your name" maxlength="14"
+          style="width:100%;padding:.95rem;border-radius:var(--r);
+                 background:var(--card);border:2px solid var(--border);
+                 color:var(--text);font-size:1.05rem;text-align:center;
+                 font-family:var(--font-body);outline:none;transition:border-color .15s;"
+          onfocus="this.style.borderColor='var(--green)'"
+          onblur="this.style.borderColor='var(--border)'"/>
+        <br><br>
+        <button class="btn btn-green" style="width:100%;font-size:1.05rem;padding:1rem;"
+          onclick="saveNameAndShowPosition()">
+          Let's Go →
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       POSITION SCREEN
+  ═══════════════════════════════════════════════ -->
+  <div id="position-screen" class="screen hidden">
+    <div style="min-height:100vh;display:flex;flex-direction:column;
+                align-items:center;justify-content:center;padding:2rem 1.25rem;">
+      <div style="max-width:440px;width:100%;">
+        <h2 style="font-size:2.8rem;color:var(--green);text-align:center;
+             line-height:1;margin-bottom:.4rem;">CHOOSE YOUR<br>POSITION</h2>
+        <p style="color:var(--text2);text-align:center;font-size:.88rem;margin-bottom:1.5rem;">
+          Unlock position-specific chapters + pro tips tailored to your role
+        </p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.85rem;margin-bottom:.85rem;">
+          <div class="pos-card striker" onclick="selectPosition('Striker')">
+            <div style="font-size:2.8rem;margin-bottom:.4rem;">⚡</div>
+            <div style="font-family:var(--font-head);font-size:1.4rem;">Striker</div>
+            <div style="font-size:.75rem;color:var(--text2);margin-top:.2rem;">Goals & finishing</div>
+          </div>
+          <div class="pos-card midfielder" onclick="selectPosition('Midfielder')">
+            <div style="font-size:2.8rem;margin-bottom:.4rem;">🎯</div>
+            <div style="font-family:var(--font-head);font-size:1.4rem;">Midfielder</div>
+            <div style="font-size:.75rem;color:var(--text2);margin-top:.2rem;">Vision & control</div>
+          </div>
+          <div class="pos-card defender" onclick="selectPosition('Defender')">
+            <div style="font-size:2.8rem;margin-bottom:.4rem;">🛡️</div>
+            <div style="font-family:var(--font-head);font-size:1.4rem;">Defender</div>
+            <div style="font-size:.75rem;color:var(--text2);margin-top:.2rem;">Tackle & organise</div>
+          </div>
+          <div class="pos-card goalkeeper" onclick="selectPosition('Goalkeeper')">
+            <div style="font-size:2.8rem;margin-bottom:.4rem;">🧤</div>
+            <div style="font-family:var(--font-head);font-size:1.4rem;">Goalkeeper</div>
+            <div style="font-size:.75rem;color:var(--text2);margin-top:.2rem;">Save everything</div>
+          </div>
+        </div>
+        <button class="btn btn-gray" style="width:100%;"
+          onclick="selectPosition('All-Rounder')">
+          ⚽ All-Rounder — master everything
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       HOME SCREEN
+  ═══════════════════════════════════════════════ -->
+  <div id="home-screen" class="screen hidden">
+
+    <!-- Sticky header -->
+    <div class="app-header">
+      <div>
+        <div style="font-family:var(--font-head);font-size:1.55rem;color:var(--green);
+             line-height:1;text-shadow:0 0 10px var(--green-glow);">FOOTY BRAIN</div>
+        <div style="font-size:.75rem;color:var(--text2);">
+          Welcome back, <span id="playerNameHeader" style="color:var(--text);font-weight:700;"></span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:.85rem;">
+        <div style="text-align:center;cursor:pointer;" onclick="showScreen('daily-screen')">
+          <div class="flame" style="font-size:1.3rem;">🔥</div>
+          <div id="streakDisplay" style="font-size:.7rem;font-weight:700;color:var(--orange);">0</div>
+        </div>
+        <button onclick="showScreen('settings-screen')"
+          style="background:var(--card2);border:1px solid var(--border);color:var(--text);
+                 width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1rem;">⚙️</button>
+      </div>
+    </div>
+
+    <!-- Daily banner -->
+    <div class="daily-banner" id="daily-banner"></div>
+
+    <div class="inner" style="padding-top:.85rem;">
+
+      <!-- XP / Level card -->
+      <div class="card" style="margin-bottom:.85rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;">
+          <div style="display:flex;align-items:center;gap:.5rem;">
+            <span style="font-family:var(--font-head);font-size:1.35rem;color:var(--green);">
+              LVL <span id="levelDisplay">1</span>
+            </span>
+            <span id="positionBadge" class="badge badge-orange">Striker</span>
+          </div>
+          <span style="font-size:.78rem;color:var(--text2);">
+            <span id="xpDisplay">0</span> XP
+          </span>
+        </div>
+        <div class="xp-bar"><div class="xp-fill" id="xpFill" style="width:0%"></div></div>
+        <div style="display:flex;justify-content:space-between;
+             font-size:.7rem;color:var(--text2);margin-top:.3rem;">
+          <span id="levelTitle">Grassroots</span>
+          <span><span id="xpToNext">150</span> XP to next</span>
+        </div>
+      </div>
+
+      <!-- Stats row -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-bottom:1.1rem;">
+        <div class="card2" style="text-align:center;">
+          <div style="font-family:var(--font-head);font-size:1.7rem;color:var(--green);"
+               id="statQuizzes">0</div>
+          <div style="font-size:.68rem;color:var(--text2);">Quizzes</div>
+        </div>
+        <div class="card2" style="text-align:center;">
+          <div style="font-family:var(--font-head);font-size:1.7rem;color:var(--orange);"
+               id="statStreak">0</div>
+          <div style="font-size:.68rem;color:var(--text2);">Streak</div>
+        </div>
+        <div class="card2" style="text-align:center;">
+          <div style="font-family:var(--font-head);font-size:1.7rem;color:var(--purple);"
+               id="statChapters">0</div>
+          <div style="font-size:.68rem;color:var(--text2);">Chapters</div>
+        </div>
+      </div>
+
+      <!-- Mini-games -->
+      <h3 style="font-family:var(--font-head);font-size:1.45rem;margin-bottom:.65rem;">
+        🎮 MINI-GAMES ARENA
+      </h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:1.25rem;">
+        <div class="game-card" onclick="showGame('penalty')">
+          <div style="font-size:2rem;">🥅</div>
+          <div style="font-weight:700;font-size:.85rem;">Penalty Shootout</div>
+          <div style="font-size:.7rem;color:var(--text2);">Beat the keeper</div>
+        </div>
+        <div class="game-card" onclick="showGame('offside')">
+          <div style="font-size:2rem;">🚩</div>
+          <div style="font-weight:700;font-size:.85rem;">Offside Judge</div>
+          <div style="font-size:.7rem;color:var(--text2);">Spot the call</div>
+        </div>
+        <div class="game-card" onclick="showGame('freekick')" style="position:relative;">
+          <div style="font-size:2rem;">⚡</div>
+          <div style="font-weight:700;font-size:.85rem;">Free-Kick Master</div>
+          <div style="font-size:.7rem;color:var(--text2);">Curve it in</div>
+          <span style="position:absolute;top:.5rem;right:.5rem;background:var(--orange);
+            color:#000;font-size:.6rem;font-weight:700;padding:.1rem .4rem;border-radius:99px;">PRO</span>
+        </div>
+        <div class="game-card" onclick="showGame('rondo')" style="position:relative;">
+          <div style="font-size:2rem;">🔄</div>
+          <div style="font-weight:700;font-size:.85rem;">Keep-Away Rondo</div>
+          <div style="font-size:.7rem;color:var(--text2);">Possession IQ</div>
+          <span style="position:absolute;top:.5rem;right:.5rem;background:var(--orange);
+            color:#000;font-size:.6rem;font-weight:700;padding:.1rem .4rem;border-radius:99px;">PRO</span>
+        </div>
+        <div class="game-card" onclick="showGame('scanning')" style="position:relative;">
+          <div style="font-size:2rem;">👁️</div>
+          <div style="font-weight:700;font-size:.85rem;">Scanning Drill</div>
+          <div style="font-size:.7rem;color:var(--text2);">Read the pitch</div>
+          <span style="position:absolute;top:.5rem;right:.5rem;background:var(--orange);
+            color:#000;font-size:.6rem;font-weight:700;padding:.1rem .4rem;border-radius:99px;">PRO</span>
+        </div>
+        <div class="game-card" onclick="showGame('header')" style="position:relative;">
+          <div style="font-size:2rem;">🏹</div>
+          <div style="font-weight:700;font-size:.85rem;">Header Challenge</div>
+          <div style="font-size:.7rem;color:var(--text2);">Time it perfectly</div>
+          <span style="position:absolute;top:.5rem;right:.5rem;background:var(--orange);
+            color:#000;font-size:.6rem;font-weight:700;padding:.1rem .4rem;border-radius:99px;">PRO</span>
+        </div>
+      </div>
+
+      <!-- Chapters -->
+      <h3 style="font-family:var(--font-head);font-size:1.45rem;margin-bottom:.65rem;">
+        📚 YOUR CHAPTERS
+      </h3>
+      <div id="chapterList"></div>
+
+    </div><!-- /inner -->
+  </div><!-- /home-screen -->
+
+  <!-- ════════════════════════════════════════════
+       QUIZ SCREEN
+  ═══════════════════════════════════════════════ -->
+  <div id="quiz-screen" class="screen hidden">
+    <div class="inner" style="padding-top:.85rem;">
+      <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.85rem;">
+        <button onclick="backToHome()" class="btn btn-gray"
+          style="padding:.5rem .8rem;font-size:.85rem;">← Back</button>
+        <div style="flex:1;">
+          <div id="quizChapterTitle" style="font-size:.75rem;color:var(--text2);
+               margin-bottom:.3rem;font-weight:600;"></div>
+          <div style="display:flex;align-items:center;gap:.5rem;">
+            <div class="xp-bar" style="flex:1;">
+              <div class="xp-fill" id="quizProgress" style="width:0%"></div>
+            </div>
+            <span style="font-size:.72rem;color:var(--text2);white-space:nowrap;">
+              Q<span id="qNum">1</span>/<span id="qTotal">7</span>
+            </span>
+          </div>
+        </div>
+        <div style="font-size:.75rem;font-weight:700;color:var(--green);white-space:nowrap;">
+          +<span id="qXPEarn">20</span> XP
+        </div>
+      </div>
+      <div id="quiz-area"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       GAME SCREEN
+  ═══════════════════════════════════════════════ -->
+  <div id="game-screen" class="screen hidden">
+    <div class="inner" style="padding-top:.85rem;">
+      <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.85rem;">
+        <button onclick="backToHome()" class="btn btn-gray"
+          style="padding:.5rem .8rem;font-size:.85rem;">← Back</button>
+        <h2 id="gameTitle" style="font-size:1.7rem;"></h2>
+      </div>
+      <div id="game-container"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       DAILY CHALLENGE SCREEN
+  ═══════════════════════════════════════════════ -->
+  <div id="daily-screen" class="screen hidden">
+    <div class="inner" style="padding-top:.85rem;">
+      <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.85rem;">
+        <button onclick="backToHome()" class="btn btn-gray"
+          style="padding:.5rem .8rem;font-size:.85rem;">← Back</button>
+        <h2 style="font-size:1.7rem;color:var(--green);">DAILY CHALLENGE</h2>
+      </div>
+      <div id="daily-content"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       LEADERBOARD SCREEN
+  ═══════════════════════════════════════════════ -->
+  <div id="leaderboard-screen" class="screen hidden">
+    <div class="inner" style="padding-top:.85rem;">
+      <div style="margin-bottom:1rem;">
+        <h2 style="font-family:var(--font-head);font-size:2rem;color:var(--green);">
+          🏆 LEADERBOARD
+        </h2>
+        <p style="color:var(--text2);font-size:.82rem;">Your personal bests & progress</p>
+      </div>
+      <div id="lbContent"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       PROFILE SCREEN
+  ═══════════════════════════════════════════════ -->
+  <div id="profile-screen" class="screen hidden">
+    <div class="inner" style="padding-top:.85rem;">
+      <div style="margin-bottom:1rem;">
+        <h2 style="font-family:var(--font-head);font-size:2rem;color:var(--green);">
+          ⭐ MY PROFILE
+        </h2>
+      </div>
+      <div id="profileContent"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       SETTINGS SCREEN
+  ═══════════════════════════════════════════════ -->
+  <div id="settings-screen" class="screen hidden">
+    <div class="inner" style="padding-top:.85rem;">
+      <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;">
+        <button onclick="backToHome()" class="btn btn-gray"
+          style="padding:.5rem .8rem;font-size:.85rem;">← Back</button>
+        <h2 style="font-family:var(--font-head);font-size:1.8rem;">SETTINGS</h2>
+      </div>
+      <div id="settingsContent"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       BOTTOM NAV
+  ═══════════════════════════════════════════════ -->
+  <nav id="main-nav" class="hidden">
+    <button id="nav-home" onclick="showScreen('home-screen');setActiveNav('nav-home')">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+      Home
+    </button>
+    <button id="nav-learn" onclick="showScreen('home-screen');setActiveNav('nav-learn');
+      setTimeout(()=>document.getElementById('chapterList')?.scrollIntoView({behavior:'smooth'}),200)">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/>
+        <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
+      </svg>
+      Learn
+    </button>
+    <button id="nav-daily" onclick="showScreen('daily-screen');setActiveNav('nav-daily')">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8"  y1="2" x2="8"  y2="6"/>
+        <line x1="3"  y1="10" x2="21" y2="10"/>
+      </svg>
+      Daily
+    </button>
+    <button id="nav-lb" onclick="showScreen('leaderboard-screen');setActiveNav('nav-lb')">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="20" x2="18" y2="10"/>
+        <line x1="12" y1="20" x2="12" y2="4"/>
+        <line x1="6"  y1="20" x2="6"  y2="14"/>
+      </svg>
+      Scores
+    </button>
+    <button id="nav-profile" onclick="showScreen('profile-screen');setActiveNav('nav-profile')">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+      Profile
+    </button>
+  </nav>
+
+</div><!-- /app -->
+
+<!-- ════ SCRIPTS — order matters ════ -->
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script src="games.js"></script>
+
+</body>
+</html>
