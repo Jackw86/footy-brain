@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="application-name" content="Footy Brain"/>
+  <meta name="apple-mobile-web-app-title" content="Footy Brain"/>
+  <title>Footy Brain</title>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#05080f"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Bangers&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700;9..40,900&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<style>
+/* ══════════════════════════════════
+   DESIGN TOKENS
+══════════════════════════════════ */
+:root {
+  --bg:   #05080f;
+  --bg2:  #08101e;
+  --s1:   rgba(255,255,255,.04);
+  --s2:   rgba(255,255,255,.07);
+  --s3:   rgba(255,255,255,.12);
+  --b1:   rgba(255,255,255,.07);
+  --b2:   rgba(255,255,255,.13);
+  --b3:   rgba(255,255,255,.22);
+  --t1:   #f0f4ff;
+  --t2:   rgba(240,244,255,.5);
+  --t3:   rgba(240,244,255,.2);
+  --lime: #b8ff57; --limeG: rgba(184,255,87,.22);
+  --sky:  #5edfff; --skyG:  rgba(94,223,255,.2);
+  --amber:#ffb627; --amberG:rgba(255,182,39,.2);
+  --rose: #ff5e8a; --roseG: rgba(255,94,138,.2);
+  --plum: #9b7fff; --plumG: rgba(155,127,255,.2);
+  --gold: #fbbf24; --goldG: rgba(251,191,36,.25);
+  --lvl1:#4ade80; --lvl2:#5edfff; --lvl3:#ffb627;
+  --lvl4:#f87171; --lvl5:#fbbf24;
+  --r:16px; --rl:22px; --rx:28px;
+  --blur: saturate(180%) blur(20px);
+}
+
+[data-theme="light"] {
+  --bg:#f0f4f8; --bg2:#e4ecf4;
+  --s1:rgba(255,255,255,.7); --s2:rgba(255,255,255,.9); --s3:rgba(255,255,255,1);
+  --b1:rgba(0,0,0,.08); --b2:rgba(0,0,0,.13); --b3:rgba(0,0,0,.2);
+  --t1:#0d1628; --t2:rgba(13,22,40,.5); --t3:rgba(13,22,40,.22);
+  --lime:#5cb800; --limeG:rgba(92,184,0,.2);
+}
+
+/* ══════════════════════════════════
+   RESET & BASE
+══════════════════════════════════ */
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+html, body { height:100%; overflow:hidden; }
+body {
+  background:var(--bg); color:var(--t1);
+  font-family:'DM Sans',sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ══ Ambient mesh ══ */
+.blob {
+  position:fixed; border-radius:50%;
+  filter:blur(80px); opacity:.28;
+  pointer-events:none; z-index:0; will-change:transform;
+}
+.bl-a { width:500px;height:500px;top:-150px;left:-100px;
+  background:radial-gradient(circle,#0d2a0d,transparent 70%);
+  animation:ba 20s ease-in-out infinite alternate; }
+.bl-b { width:400px;height:400px;top:30%;right:-120px;
+  background:radial-gradient(circle,#05102a,transparent 70%);
+  animation:bb 25s ease-in-out infinite alternate; }
+.bl-c { width:350px;height:350px;bottom:0;left:15%;
+  background:radial-gradient(circle,#1a1205,transparent 70%);
+  animation:bc 18s ease-in-out infinite alternate; }
+@keyframes ba{from{transform:translate(0,0)}to{transform:translate(70px,50px)}}
+@keyframes bb{from{transform:translate(0,0)}to{transform:translate(-50px,70px)}}
+@keyframes bc{from{transform:translate(0,0)}to{transform:translate(50px,-40px)}}
+
+.grain {
+  position:fixed; inset:0; pointer-events:none; opacity:.025; z-index:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ══════════════════════════════════
+   APP SHELL
+══════════════════════════════════ */
+#app {
+  position:relative; z-index:1;
+  height:100vh; max-width:430px; margin:0 auto;
+  display:flex; flex-direction:column; overflow:hidden;
+}
+
+/* ══ Screens ══ */
+.screen {
+  position:absolute; inset:0;
+  display:flex; flex-direction:column; overflow:hidden;
+  opacity:0; pointer-events:none;
+  transition:opacity .22s, transform .22s;
+  transform:translateY(10px);
+}
+.screen.on {
+  opacity:1; pointer-events:all; transform:translateY(0);
+}
+.screen.hidden { display:none !important; }
+.sb {
+  flex:1; overflow-y:auto; overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none; padding-bottom:88px;
+}
+.sb::-webkit-scrollbar { display:none; }
+
+/* ══════════════════════════════════
+   HEADER
+══════════════════════════════════ */
+.hdr {
+  flex-shrink:0;
+  padding:.78rem 1.2rem .68rem;
+  display:flex; align-items:center; justify-content:space-between;
+  background:rgba(5,8,15,.78);
+  backdrop-filter:var(--blur);
+  -webkit-backdrop-filter:var(--blur);
+  border-bottom:1px solid var(--b1);
+  position:relative; z-index:10;
+}
+.logo {
+  font-family:'Bebas Neue',sans-serif; font-size:1.45rem; line-height:1;
+  background:linear-gradient(135deg,var(--lime),var(--sky));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.hdr-sub { font-size:.68rem; color:var(--t2); margin-top:.07rem; }
+.streak-pill {
+  display:flex; align-items:center; gap:.28rem;
+  background:rgba(255,182,39,.1); border:1px solid rgba(255,182,39,.22);
+  padding:.26rem .58rem; border-radius:99px;
+  font-size:.72rem; font-weight:800; color:var(--amber);
+  cursor:pointer;
+}
+.hearts { display:flex; gap:.14rem; }
+.heart { font-size:.85rem; transition:all .3s; }
+.heart.empty { opacity:.2; filter:grayscale(1); }
+@keyframes heartLose {
+  0%{transform:scale(1.4);filter:brightness(2);}
+  100%{transform:scale(1);opacity:.2;filter:grayscale(1);}
+}
+.heart.losing { animation:heartLose .4s ease forwards; }
+
+/* ══════════════════════════════════
+   BOTTOM NAV
+══════════════════════════════════ */
+#main-nav {
+  position:fixed; bottom:0; left:50%; transform:translateX(-50%);
+  width:100%; max-width:430px;
+  padding:.58rem 0 calc(.58rem + env(safe-area-inset-bottom));
+  background:rgba(5,8,15,.85);
+  backdrop-filter:var(--blur);
+  -webkit-backdrop-filter:var(--blur);
+  border-top:1px solid var(--b1);
+  z-index:100;
+}
+#main-nav.hidden { display:none !important; }
+.nav-row { display:flex; justify-content:space-around; }
+.nb {
+  display:flex; flex-direction:column; align-items:center; gap:.2rem;
+  background:none; border:none; color:var(--t2);
+  font-family:'DM Sans',sans-serif; font-size:.57rem; font-weight:700;
+  letter-spacing:.05em; text-transform:uppercase;
+  min-width:52px; padding:.2rem .4rem;
+  cursor:pointer; position:relative; transition:color .14s;
+  -webkit-tap-highlight-color:transparent;
+}
+.nb svg { width:20px; height:20px; stroke:currentColor; fill:none;
+  stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.nb.on { color:var(--lime); }
+.nb.on::before {
+  content:''; position:absolute; top:-1px; left:50%; transform:translateX(-50%);
+  width:18px; height:2px; border-radius:99px;
+  background:var(--lime); box-shadow:0 0 8px var(--limeG);
+}
+
+/* ══════════════════════════════════
+   GLASS COMPONENTS
+══════════════════════════════════ */
+.glass {
+  background:var(--s1);
+  backdrop-filter:var(--blur); -webkit-backdrop-filter:var(--blur);
+  border:1px solid var(--b1); border-radius:var(--r);
+  position:relative; overflow:hidden;
+}
+.glass::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.1),transparent);
+  pointer-events:none;
+}
+.glass2 {
+  background:var(--s2); border:1px solid var(--b2);
+  border-radius:var(--r); position:relative;
+}
+
+/* ══════════════════════════════════
+   TYPOGRAPHY
+══════════════════════════════════ */
+.disp { font-family:'Bebas Neue',sans-serif; letter-spacing:.03em; }
+.lbl {
+  font-size:.63rem; font-weight:700;
+  letter-spacing:.11em; text-transform:uppercase; color:var(--t2);
+}
+
+/* ══════════════════════════════════
+   PILLS
+══════════════════════════════════ */
+.pill {
+  display:inline-flex; align-items:center; gap:.27rem;
+  padding:.17rem .58rem; border-radius:99px; font-size:.68rem; font-weight:700;
+}
+.pl { background:rgba(184,255,87,.09); color:var(--lime); border:1px solid rgba(184,255,87,.2); }
+.ps { background:rgba(94,223,255,.09); color:var(--sky);  border:1px solid rgba(94,223,255,.2); }
+.pa { background:rgba(255,182,39,.09); color:var(--amber);border:1px solid rgba(255,182,39,.2); }
+.pg { background:rgba(251,191,36,.1);  color:var(--gold); border:1px solid rgba(251,191,36,.25);}
+.pp { background:rgba(155,127,255,.09);color:var(--plum); border:1px solid rgba(155,127,255,.2);}
+.pr { background:rgba(255,94,138,.09); color:var(--rose); border:1px solid rgba(255,94,138,.2); }
+
+/* ══════════════════════════════════
+   XP BAR
+══════════════════════════════════ */
+.xpt { height:5px; border-radius:99px; background:rgba(255,255,255,.07); overflow:hidden; }
+.xpf {
+  height:100%; border-radius:99px;
+  background:linear-gradient(90deg,var(--lime),var(--sky));
+  position:relative; overflow:hidden;
+  transition:width .7s cubic-bezier(.34,1.56,.64,1);
+}
+.xpf::after {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent);
+  animation:shimmer 2.5s linear infinite;
+}
+@keyframes shimmer { from{transform:translateX(-100%)} to{transform:translateX(300%)} }
+
+/* ══════════════════════════════════
+   BUTTONS
+══════════════════════════════════ */
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:.4rem;
+  padding:.78rem 1.35rem; border-radius:12px;
+  font-family:'DM Sans',sans-serif; font-weight:700; font-size:.9rem;
+  cursor:pointer; border:none; transition:all .14s; line-height:1;
+  -webkit-tap-highlight-color:transparent;
+}
+.btl { background:var(--lime); color:#000; box-shadow:0 4px 20px var(--limeG); }
+.btl:hover { filter:brightness(1.08); transform:translateY(-1px); }
+.btl:active { transform:scale(.97); }
+.btg { background:var(--s2); color:var(--t1); border:1px solid var(--b2); }
+.btg:hover { background:var(--s3); }
+.btg:active { transform:scale(.98); }
+.bta { background:var(--amber); color:#000; box-shadow:0 4px 16px var(--amberG); }
+.btr { background:var(--rose); color:#fff; box-shadow:0 4px 16px var(--roseG); }
+.btd { background:linear-gradient(135deg,var(--gold),#d97706); color:#000; box-shadow:0 4px 20px var(--goldG); }
+
+/* ══════════════════════════════════
+   ANIMATIONS
+══════════════════════════════════ */
+@keyframes up  { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+@keyframes pop { 0%{transform:scale(.8);opacity:0} 70%{transform:scale(1.04)} 100%{transform:scale(1);opacity:1} }
+@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-7px)} 40%{transform:translateX(7px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+@keyframes nodepulse {
+  0%,100%{box-shadow:0 0 0 4px rgba(184,255,87,.18),0 6px 24px rgba(184,255,87,.25);}
+  50%    {box-shadow:0 0 0 9px rgba(184,255,87,.07),0 8px 32px rgba(184,255,87,.35);}
+}
+@keyframes crownbob { from{transform:translateX(-50%) translateY(0)} to{transform:translateX(-50%) translateY(-3px)} }
+@keyframes artbob   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+@keyframes packshake {
+  0%,100%{transform:rotate(0) scale(1)} 15%{transform:rotate(-4deg) scale(1.05)}
+  30%{transform:rotate(4deg) scale(1.08)} 45%{transform:rotate(-3deg) scale(1.06)}
+  60%{transform:rotate(3deg) scale(1.04)} 75%{transform:rotate(-1deg) scale(1.02)}
+}
+@keyframes revealin {
+  from{transform:translateY(60px) scale(.85) rotateY(15deg);opacity:0;}
+  to  {transform:translateY(0) scale(1) rotateY(0deg);opacity:1;}
+}
+@keyframes foil { 0%,100%{opacity:.4} 50%{opacity:1} }
+@keyframes fxp  {
+  0%  {opacity:1;transform:translateY(0) scale(1);}
+  70% {opacity:1;transform:translateY(-55px) scale(1.1);}
+  100%{opacity:0;transform:translateY(-75px) scale(.9);}
+}
+.au { animation:up .3s ease both; }
+.ap { animation:pop .4s cubic-bezier(.34,1.56,.64,1) both; }
+
+/* ══════════════════════════════════
+   PATH SCREEN
+══════════════════════════════════ */
+.you-here {
+  display:flex; align-items:center; gap:.48rem;
+  width:fit-content; margin:0 auto .85rem;
+  background:linear-gradient(135deg,rgba(184,255,87,.09),rgba(94,223,255,.06));
+  border:1px solid rgba(184,255,87,.17); border-radius:99px;
+  padding:.3rem .85rem .3rem .48rem; font-size:.7rem; font-weight:700;
+}
+.you-dot {
+  width:8px; height:8px; border-radius:50%;
+  background:var(--lime); box-shadow:0 0 6px var(--lime);
+  animation:pulse 1.5s ease-in-out infinite;
+}
+.zone-b {
+  margin:0 1.2rem .5rem; border-radius:13px;
+  padding:.78rem .95rem; display:flex; align-items:center; gap:.68rem;
+  position:relative; overflow:hidden;
+}
+.zone-b::after {
+  content:''; position:absolute; right:-12px; top:-12px;
+  width:70px; height:70px; border-radius:50%;
+  background:radial-gradient(circle,var(--zc,rgba(255,255,255,.04)),transparent 70%);
+  pointer-events:none;
+}
+.ptrack { display:flex; flex-direction:column; align-items:center; }
+.nrow   { display:flex; width:100%; justify-content:center; }
+.nrow:nth-child(odd)  .nwrap { margin-left:72px; }
+.nrow:nth-child(even) .nwrap { margin-right:72px; }
+.nwrap {
+  display:flex; flex-direction:column; align-items:center;
+  padding:12px 0; cursor:pointer; -webkit-tap-highlight-color:transparent;
+}
+.node {
+  width:70px; height:70px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.95rem; position:relative;
+  transition:transform .18s cubic-bezier(.34,1.56,.64,1); flex-shrink:0;
+}
+.node:hover { transform:scale(1.1); }
+.node:active { transform:scale(.94); }
+.n-idle   { background:rgba(255,255,255,.045); border:2px solid rgba(255,255,255,.09); }
+.n-done   { background:linear-gradient(135deg,var(--lime),var(--sky));
+  box-shadow:0 0 0 3px rgba(184,255,87,.12),0 4px 16px rgba(184,255,87,.18); }
+.n-active { background:linear-gradient(135deg,var(--lime),var(--sky));
+  animation:nodepulse 2.5s ease-in-out infinite; }
+.n-lock   { background:rgba(255,255,255,.02); border:2px solid rgba(255,255,255,.05);
+  opacity:.32; cursor:not-allowed; }
+.n-master {
+  background:linear-gradient(135deg,var(--gold),#d97706);
+  box-shadow:0 0 0 3px rgba(251,191,36,.15),0 4px 20px rgba(251,191,36,.22);
+}
+.n-master::after {
+  content:'👑'; position:absolute; top:-12px; left:50%;
+  transform:translateX(-50%); font-size:.88rem;
+  animation:crownbob .9s ease-in-out infinite alternate;
+}
+.nlbl { font-size:.7rem; font-weight:700; text-align:center; max-width:82px; line-height:1.2; margin-top:.43rem; }
+.ndots { display:flex; gap:.25rem; margin-top:.28rem; }
+.nd    { width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,.1); }
+.nd.c1 { background:var(--lvl1); box-shadow:0 0 4px var(--lvl1); }
+.nd.c2 { background:var(--lvl2); box-shadow:0 0 4px var(--lvl2); }
+.nd.c3 { background:var(--lvl3); box-shadow:0 0 4px var(--lvl3); }
+.nd.c4 { background:var(--lvl4); box-shadow:0 0 4px var(--lvl4); }
+.nd.c5 { background:var(--lvl5); box-shadow:0 0 5px var(--lvl5); }
+.nline { width:3px; border-radius:99px; margin:0 auto; }
+.nl-done { background:linear-gradient(var(--lime),var(--sky)); }
+.nl-idle { background:var(--b1); }
+.nl-part { background:linear-gradient(var(--lime),var(--b1)); }
+
+/* Daily banner */
+.daily-banner {
+  margin:0 1.2rem .85rem;
+  background:linear-gradient(135deg,rgba(184,255,87,.07),rgba(94,223,255,.04));
+  border:1px solid rgba(184,255,87,.14); border-radius:var(--r);
+  padding:.88rem .95rem; cursor:pointer; transition:all .15s;
+  position:relative; overflow:hidden;
+}
+.daily-banner::after {
+  content:''; position:absolute; right:-15px; top:-15px;
+  width:90px; height:90px; border-radius:50%;
+  background:radial-gradient(circle,rgba(184,255,87,.1),transparent 70%);
+  pointer-events:none;
+}
+.daily-banner:hover { border-color:rgba(184,255,87,.28); }
+.daily-banner.done  { opacity:.5; cursor:default; background:var(--s1); border-color:var(--b1); }
+
+/* ══════════════════════════════════
+   QUIZ SCREEN
+══════════════════════════════════ */
+.qcard {
+  padding:1.2rem; margin-bottom:.82rem;
+  background:var(--s1); border:1px solid var(--b1); border-radius:var(--r);
+}
+.qtext { font-size:1rem; font-weight:700; line-height:1.55; letter-spacing:-.01em; }
+.qopt {
+  width:100%; padding:.86rem .93rem;
+  background:var(--s1); border:1.5px solid var(--b1); border-radius:12px;
+  color:var(--t1); font-family:'DM Sans',sans-serif;
+  font-size:.875rem; font-weight:500; text-align:left; cursor:pointer;
+  transition:all .13s; display:flex; align-items:center; gap:.68rem;
+  margin-bottom:.47rem; -webkit-tap-highlight-color:transparent;
+}
+.qopt:hover:not(:disabled) { background:var(--s2); border-color:var(--b2); }
+.qopt:active:not(:disabled) { transform:scale(.99); }
+.qopt.ok  { border-color:var(--lime)!important; background:rgba(184,255,87,.07)!important; }
+.qopt.bad { border-color:var(--rose)!important; background:rgba(255,94,138,.07)!important; animation:shake .35s ease; }
+.qltr {
+  min-width:26px; height:26px; border-radius:7px;
+  background:var(--s2); border:1px solid var(--b2);
+  display:flex; align-items:center; justify-content:center;
+  font-size:.7rem; font-weight:800; color:var(--t2);
+  flex-shrink:0; transition:all .13s;
+}
+.qopt.ok  .qltr { background:var(--lime); color:#000; border-color:var(--lime); }
+.qopt.bad .qltr { background:var(--rose); color:#fff; border-color:var(--rose); }
+.qfeed {
+  padding:.88rem; border-radius:12px; margin-bottom:.75rem;
+}
+.qfeed.ok  { background:rgba(184,255,87,.07); border:1px solid rgba(184,255,87,.2); }
+.qfeed.bad { background:rgba(255,94,138,.07); border:1px solid rgba(255,94,138,.2); }
+
+/* ══════════════════════════════════
+   FULL SCREEN LEVEL INTRO
+══════════════════════════════════ */
+#lvl-intro {
+  position:fixed; inset:0; z-index:150;
+  display:none; flex-direction:column; overflow:hidden; background:var(--bg);
+  animation:fadeInScreen .3s ease both;
+}
+#lvl-intro.show { display:flex; }
+@keyframes fadeInScreen { from{opacity:0} to{opacity:1} }
+.fsi-glow {
+  position:absolute; top:-120px; left:50%; transform:translateX(-50%);
+  width:350px; height:350px; border-radius:50%;
+  filter:blur(70px); opacity:.45; pointer-events:none; z-index:0;
+}
+.fsi-scroll { flex:1; overflow-y:auto; scrollbar-width:none; z-index:1; position:relative; }
+.fsi-scroll::-webkit-scrollbar { display:none; }
+.fsi-hero {
+  display:flex; flex-direction:column; align-items:center;
+  text-align:center; padding:2.5rem 1.5rem 1.25rem;
+}
+.fsi-emoji {
+  font-size:6rem; line-height:1; margin-bottom:.85rem;
+  animation:artbob 3s ease-in-out infinite;
+}
+.fsi-chapter {
+  font-family:'Bebas Neue',sans-serif; font-size:2.6rem; line-height:1; margin-bottom:.2rem;
+}
+.fsi-level {
+  font-family:'Bebas Neue',sans-serif; font-size:1.2rem; letter-spacing:.08em; margin-bottom:.85rem;
+}
+.fsi-quote {
+  font-size:.9rem; line-height:1.65; color:var(--t2); font-style:italic;
+  max-width:320px; padding:.75rem 1rem;
+  background:var(--s1); border:1px solid var(--b1); border-radius:14px;
+}
+.fsi-body { padding:0 1.25rem 1.75rem; }
+.fsi-learns { display:flex; flex-direction:column; gap:.38rem; margin:.9rem 0 1.25rem; }
+.fsi-learn-item {
+  display:flex; align-items:flex-start; gap:.6rem;
+  padding:.65rem .85rem; border-radius:12px;
+  background:var(--s1); border:1px solid var(--b1);
+  font-size:.84rem; line-height:1.45;
+}
+.fsi-cta {
+  width:100%; padding:1.05rem; border:none; border-radius:14px;
+  font-family:'DM Sans',sans-serif; font-weight:900; font-size:1rem;
+  cursor:pointer; transition:all .15s; color:#000; position:relative; overflow:hidden;
+}
+.fsi-cta:hover { filter:brightness(1.08); transform:translateY(-1px); }
+.fsi-cta:active { transform:scale(.98); }
+.fsi-cta-shine {
+  position:absolute; top:0; left:-100%; width:100%; height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);
+  animation:ctasweep 2.5s ease-in-out infinite;
+}
+@keyframes ctasweep { 0%{left:-100%} 60%,100%{left:100%} }
+
+/* ══════════════════════════════════
+   SLIDE-UP CARD INTRO (repeat)
+══════════════════════════════════ */
+#lvl-card {
+  position:fixed; inset:0; z-index:150;
+  display:none; align-items:flex-end; justify-content:center;
+  padding:1rem;
+}
+#lvl-card.show { display:flex; }
+.lc-backdrop {
+  position:absolute; inset:0;
+  background:rgba(0,0,0,.6); backdrop-filter:blur(6px);
+}
+.lc-sheet {
+  position:relative; z-index:1;
+  width:100%; max-width:420px;
+  background:#0a1425; border:1px solid var(--b2);
+  border-radius:24px 24px 20px 20px;
+  overflow:hidden; max-height:86vh;
+  overflow-y:auto; scrollbar-width:none;
+  animation:sheetup .38s cubic-bezier(.34,1.2,.64,1) both;
+}
+.lc-sheet::-webkit-scrollbar { display:none; }
+@keyframes sheetup { from{transform:translateY(100%);opacity:0;} to{transform:translateY(0);opacity:1;} }
+.lc-drag { width:40px;height:4px;border-radius:99px;background:var(--b2);margin:1rem auto .85rem; }
+
+/* ══════════════════════════════════
+   PACK OPENING
+══════════════════════════════════ */
+.packcard {
+  border-radius:20px; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:.7rem;
+  cursor:pointer; position:relative; overflow:hidden; transition:transform .2s;
+}
+.packcard:hover  { transform:scale(1.03) rotate(.4deg); }
+.packcard:active { transform:scale(.97); }
+.pc-common   { background:linear-gradient(135deg,#1e293b,#0f172a); border:3px solid #475569; }
+.pc-uncommon { background:linear-gradient(135deg,#052e16,#14532d); border:3px solid #4ade80; box-shadow:0 0 20px rgba(74,222,128,.2); }
+.pc-rare     { background:linear-gradient(135deg,#0c1445,#1e3a5f); border:3px solid #60a5fa; box-shadow:0 0 25px rgba(96,165,250,.25); animation:rarepulse 3s ease-in-out infinite; }
+.pc-epic     { background:linear-gradient(135deg,#2e1065,#581c87); border:3px solid #c084fc; box-shadow:0 0 30px rgba(192,132,252,.3); animation:epicpulse 2.5s ease-in-out infinite; }
+.pc-legendary{ background:linear-gradient(135deg,#451a03,#78350f,#451a03); border:3px solid var(--gold); box-shadow:0 0 40px rgba(251,191,36,.4),0 0 80px rgba(251,191,36,.15); animation:legpulse 2s ease-in-out infinite; }
+@keyframes rarepulse  { 0%,100%{box-shadow:0 0 20px rgba(96,165,250,.2)}  50%{box-shadow:0 0 35px rgba(96,165,250,.4)} }
+@keyframes epicpulse  { 0%,100%{box-shadow:0 0 25px rgba(192,132,252,.25)} 50%{box-shadow:0 0 45px rgba(192,132,252,.5)} }
+@keyframes legpulse   { 0%,100%{box-shadow:0 0 40px rgba(251,191,36,.35),0 0 80px rgba(251,191,36,.1)} 50%{box-shadow:0 0 60px rgba(251,191,36,.6),0 0 120px rgba(251,191,36,.2)} }
+.pburst {
+  position:absolute; inset:0;
+  background:conic-gradient(from 0deg,
+    rgba(255,255,255,.015) 0deg,rgba(255,255,255,.05) 20deg,rgba(255,255,255,.015) 40deg,
+    rgba(255,255,255,.05) 60deg,rgba(255,255,255,.015) 80deg,rgba(255,255,255,.05) 100deg,
+    rgba(255,255,255,.015) 120deg,rgba(255,255,255,.05) 140deg,rgba(255,255,255,.015) 160deg,
+    rgba(255,255,255,.05) 180deg,rgba(255,255,255,.015) 200deg,rgba(255,255,255,.05) 220deg,
+    rgba(255,255,255,.015) 240deg,rgba(255,255,255,.05) 260deg,rgba(255,255,255,.015) 280deg,
+    rgba(255,255,255,.05) 300deg,rgba(255,255,255,.015) 320deg,rgba(255,255,255,.05) 340deg,
+    rgba(255,255,255,.015) 360deg);
+}
+
+/* Revealed card */
+.rcard { border-radius:17px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.7); animation:revealin .5s cubic-bezier(.34,1.56,.64,1) both; }
+.rcard-art { width:100%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; background:#0d1525; }
+.rcard-artbg {
+  position:absolute; inset:0;
+  background:conic-gradient(from 0deg,
+    rgba(255,255,255,.01) 0deg,rgba(255,255,255,.04) 20deg,rgba(255,255,255,.01) 40deg,
+    rgba(255,255,255,.04) 60deg,rgba(255,255,255,.01) 80deg,rgba(255,255,255,.04) 100deg,
+    rgba(255,255,255,.01) 120deg,rgba(255,255,255,.04) 140deg,rgba(255,255,255,.01) 160deg,
+    rgba(255,255,255,.04) 180deg,rgba(255,255,255,.01) 200deg,rgba(255,255,255,.04) 220deg,
+    rgba(255,255,255,.01) 240deg,rgba(255,255,255,.04) 260deg,rgba(255,255,255,.01) 280deg,
+    rgba(255,255,255,.04) 300deg,rgba(255,255,255,.01) 320deg,rgba(255,255,255,.04) 340deg,
+    rgba(255,255,255,.01) 360deg);
+}
+.rcard-emoji { font-size:4.2rem; position:relative; z-index:1; animation:artbob 3s ease-in-out infinite; }
+.rcard-artlbl { position:absolute; bottom:.45rem; left:50%; transform:translateX(-50%); font-size:.55rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.32); background:rgba(0,0,0,.4); padding:.18rem .5rem; border-radius:99px; }
+.rstat { display:flex; align-items:center; gap:.32rem; }
+.rsl   { font-size:.55rem; font-weight:700; color:rgba(255,255,255,.58); min-width:42px; }
+.rsb   { flex:1; height:5px; background:rgba(255,255,255,.08); border-radius:99px; overflow:hidden; }
+.rsf   { height:100%; border-radius:99px; }
+.rsv   { font-size:.63rem; font-weight:800; color:#fff; min-width:17px; text-align:right; }
+
+/* ══════════════════════════════════
+   COLLECTION SCREEN
+══════════════════════════════════ */
+.serhdr { background:linear-gradient(135deg,rgba(251,191,36,.08),rgba(155,127,255,.06)); border:1px solid rgba(251,191,36,.14); border-radius:13px; padding:.82rem .95rem; }
+.serfill { height:4px; border-radius:99px; background:linear-gradient(90deg,var(--gold),var(--amber)); }
+.cgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:.52rem; }
+.ccard { aspect-ratio:3/4; border-radius:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.28rem; position:relative; overflow:hidden; cursor:pointer; transition:transform .17s; }
+.ccard:hover { transform:scale(1.05); }
+.ccard.owned { background:linear-gradient(135deg,#0d1525,#1a2a4a); }
+.ccard.myst  { background:linear-gradient(135deg,#080d18,#0f1620); border:1px solid rgba(255,255,255,.05); }
+.cemoji { font-size:2.1rem; position:relative; z-index:1; }
+.ccard.myst .cemoji { filter:brightness(0); opacity:.18; }
+.cname  { font-size:.57rem; font-weight:700; text-align:center; padding:0 .28rem; line-height:1.2; position:relative; z-index:1; }
+.ccard.myst .cname { color:var(--t3); }
+.crdot  { width:6px; height:6px; border-radius:50%; position:absolute; top:.42rem; right:.42rem; }
+.cfoil  { position:absolute; inset:0; border-radius:12px; background:linear-gradient(135deg,transparent 30%,rgba(255,255,255,.04) 50%,transparent 70%); animation:foil 4s ease-in-out infinite; }
+.myq    { font-size:1.4rem; opacity:.14; position:absolute; }
+
+/* ══════════════════════════════════
+   PROFILE SCREEN
+══════════════════════════════════ */
+.profav { width:88px; height:88px; border-radius:50%; margin:0 auto .72rem; background:linear-gradient(135deg,rgba(184,255,87,.15),rgba(94,223,255,.1)); border:2px solid rgba(184,255,87,.25); display:flex; align-items:center; justify-content:center; font-size:3.4rem; box-shadow:0 0 0 4px rgba(184,255,87,.07),0 8px 32px rgba(0,0,0,.5); position:relative; z-index:1; }
+.bslot { aspect-ratio:1; border-radius:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.18rem; font-size:1.5rem; transition:transform .15s; cursor:pointer; }
+.bslot:hover { transform:scale(1.08); }
+.bslot.earned { background:var(--s2); border:1px solid var(--b2); }
+.bslot.locked { background:rgba(255,255,255,.02); border:1px solid rgba(255,255,255,.04); opacity:.26; filter:grayscale(1); }
+.blbl { font-size:.57rem; font-weight:700; color:var(--t2); text-align:center; line-height:1.2; padding:0 .12rem; }
+
+/* ══════════════════════════════════
+   PRO SCREEN
+══════════════════════════════════ */
+.pro-feature { display:flex; align-items:flex-start; gap:.65rem; padding:.7rem .85rem; background:var(--s1); border:1px solid var(--b1); border-radius:var(--r-sm,12px); margin-bottom:.4rem; transition:background .15s; }
+.pro-feature:hover { background:var(--s2); }
+
+/* ══════════════════════════════════
+   MODALS
+══════════════════════════════════ */
+.modal {
+  position:fixed; inset:0; z-index:200;
+  display:none; align-items:center; justify-content:center;
+  padding:1.25rem; background:rgba(0,0,0,.88); backdrop-filter:blur(8px);
+}
+.modal.show { display:flex; }
+.modal-box {
+  background:var(--bg2); border:1px solid var(--b2); border-radius:var(--rx);
+  padding:1.75rem; max-width:360px; width:100%;
+  animation:pop .4s cubic-bezier(.34,1.56,.64,1) both;
+  max-height:90vh; overflow-y:auto; scrollbar-width:none;
+}
+.modal-box::-webkit-scrollbar { display:none; }
+
+/* ══════════════════════════════════
+   TOGGLE
+══════════════════════════════════ */
+.toggle { position:relative; width:46px; height:24px; }
+.toggle input { opacity:0; width:0; height:0; }
+.toggle-slider { position:absolute; inset:0; background:rgba(255,255,255,.12); border:1px solid var(--b2); border-radius:99px; cursor:pointer; transition:.25s; }
+.toggle-slider::before { content:''; position:absolute; height:18px; width:18px; left:2px; top:2px; background:var(--t2); border-radius:50%; transition:.25s; }
+input:checked + .toggle-slider { background:var(--lime); border-color:var(--lime); }
+input:checked + .toggle-slider::before { transform:translateX(22px); background:#000; }
+
+/* ══════════════════════════════════
+   FLOATING XP
+══════════════════════════════════ */
+.fxp {
+  position:fixed; z-index:300;
+  font-family:'Bebas Neue',sans-serif; font-size:1.3rem; color:var(--lime);
+  pointer-events:none; text-shadow:0 0 12px var(--limeG);
+  animation:fxp 1.1s ease forwards;
+}
+
+/* ══════════════════════════════════
+   TOAST
+══════════════════════════════════ */
+#toast {
+  position:fixed; top:1.1rem; left:50%; transform:translateX(-50%);
+  background:rgba(8,13,24,.96); border:1px solid var(--b2);
+  backdrop-filter:blur(16px); color:var(--t1);
+  font-weight:700; font-size:.78rem;
+  padding:.5rem 1.08rem; border-radius:99px; z-index:400;
+  opacity:0; transition:opacity .22s; pointer-events:none;
+  white-space:nowrap; max-width:calc(100vw - 2rem);
+  box-shadow:0 8px 32px rgba(0,0,0,.5);
+}
+#toast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<!-- Ambient -->
+<div class="blob bl-a"></div>
+<div class="blob bl-b"></div>
+<div class="blob bl-c"></div>
+<div class="grain"></div>
+<div id="toast"></div>
+
+<div id="app">
+
+<!-- ══════════════════════════════════
+  ONBOARDING — NAME
+══════════════════════════════════ -->
+<div class="screen on" id="s-name">
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem 1.5rem;text-align:center;">
+    <div style="font-size:4.5rem;margin-bottom:.75rem;animation:artbob 3s ease-in-out infinite;filter:drop-shadow(0 0 24px var(--limeG));">🧠⚽</div>
+    <h1 class="disp" style="font-size:3.8rem;line-height:.88;background:linear-gradient(135deg,var(--lime),var(--sky));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:.4rem;">FOOTY<br>BRAIN</h1>
+    <div class="lbl" style="letter-spacing:.18em;margin-bottom:1.75rem;">FOOTBALL ACADEMY</div>
+    <p style="color:var(--t2);font-size:.88rem;line-height:1.6;margin-bottom:2rem;">Train your football brain.<br>Quizzes · Games · Prizes · Streaks</p>
+    <p style="font-weight:700;margin-bottom:.65rem;font-size:.9rem;">What's your name, future star?</p>
+    <input id="inp-name" style="width:100%;max-width:320px;padding:.9rem 1rem;border-radius:12px;background:var(--s2);border:1.5px solid var(--b2);color:var(--t1);font-family:'DM Sans',sans-serif;font-size:1.05rem;text-align:center;outline:none;margin-bottom:1rem;transition:border-color .15s;" placeholder="Enter your name" maxlength="14"/>
+    <button class="btn btl" style="width:100%;max-width:320px;font-size:1rem;padding:1rem;" onclick="saveName()">Let's Go →</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  ONBOARDING — POSITION
+══════════════════════════════════ -->
+<div class="screen hidden" id="s-pos">
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.5rem;">
+    <h2 class="disp" style="font-size:2.5rem;color:var(--lime);text-align:center;line-height:1;margin-bottom:.35rem;">CHOOSE YOUR<br>POSITION</h2>
+    <p style="color:var(--t2);text-align:center;font-size:.82rem;margin-bottom:1.5rem;line-height:1.5;">Unlocks chapters tailored to your role</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.7rem;width:100%;max-width:400px;margin-bottom:.7rem;" id="pos-grid"></div>
+    <button class="btn btg" style="width:100%;max-width:400px;font-size:.88rem;" onclick="selectPos('All-Rounder')">⚽ All-Rounder — master everything</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  HOME / PATH SCREEN
+══════════════════════════════════ -->
+<div class="screen hidden" id="s-path">
+  <div class="hdr">
+    <div>
+      <div class="logo">FOOTY BRAIN</div>
+      <div class="hdr-sub">Hey, <strong id="hdr-name" style="color:var(--t1);"></strong> 👋</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:.58rem;">
+      <div class="streak-pill" onclick="showScreen('s-daily');setNav('nb-daily')">
+        <span style="animation:pulse 1.8s ease-in-out infinite;display:inline-block;">🔥</span>
+        <span id="streak-disp">0</span>
+      </div>
+      <div class="hearts" id="hearts-hdr">
+        <span class="heart">❤️</span><span class="heart">❤️</span>
+        <span class="heart">❤️</span><span class="heart">❤️</span>
+        <span class="heart">❤️</span>
+      </div>
+      <button onclick="showScreen('s-settings')" style="background:var(--s2);border:1px solid var(--b2);color:var(--t1);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:.9rem;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;">⚙️</button>
+    </div>
+  </div>
+  <div class="sb">
+    <div style="height:.8rem;"></div>
+    <div class="you-here au"><div class="you-dot"></div><span id="you-here-txt">Level 1 · Grassroots</span></div>
+
+    <!-- XP card -->
+    <div class="glass au" style="margin:0 1.2rem .82rem;padding:1.05rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.62rem;">
+        <div style="display:flex;align-items:center;gap:.62rem;">
+          <div style="position:relative;width:50px;height:50px;flex-shrink:0;">
+            <svg width="50" height="50" viewBox="0 0 50 50" style="transform:rotate(-90deg);">
+              <circle cx="25" cy="25" r="21" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="3.5"/>
+              <circle cx="25" cy="25" r="21" fill="none" stroke="url(#rg2)" stroke-width="3.5"
+                stroke-dasharray="131.9" id="xp-ring" stroke-dashoffset="131.9" stroke-linecap="round"/>
+              <defs><linearGradient id="rg2" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#b8ff57"/><stop offset="100%" stop-color="#5edfff"/>
+              </linearGradient></defs>
+            </svg>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:.95rem;color:var(--lime);" id="ring-lv">1</div>
+          </div>
+          <div>
+            <div class="disp" style="font-size:1.05rem;line-height:1;" id="lv-title">Grassroots</div>
+            <div id="pos-badge" class="pill pa" style="margin-top:.2rem;">Midfielder</div>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="disp" style="font-size:1.65rem;color:var(--lime);line-height:1;" id="xp-disp">0</div>
+          <div class="lbl">XP</div>
+        </div>
+      </div>
+      <div class="xpt"><div class="xpf" id="xp-fill" style="width:0%;"></div></div>
+      <div style="display:flex;justify-content:space-between;margin-top:.28rem;font-size:.63rem;color:var(--t3);">
+        <span id="lv-title2">Grassroots</span>
+        <span><span id="xp-next">150</span> XP to next level</span>
+      </div>
+    </div>
+
+    <!-- Daily banner -->
+    <div class="daily-banner au" id="daily-banner" onclick="showScreen('s-daily');setNav('nb-daily')">
+      <div style="display:flex;align-items:center;gap:.75rem;">
+        <div style="font-size:1.8rem;animation:pulse 2s ease-in-out infinite;">🔥</div>
+        <div style="flex:1;">
+          <div style="font-weight:800;font-size:.88rem;margin-bottom:.1rem;">Daily Challenge Ready</div>
+          <div style="font-size:.7rem;color:var(--t2);">5 questions · Builds your streak · Bonus XP</div>
+        </div>
+        <div style="background:var(--lime);color:#000;font-weight:900;font-size:.68rem;padding:.28rem .65rem;border-radius:99px;white-space:nowrap;flex-shrink:0;">GO →</div>
+      </div>
+    </div>
+
+    <!-- Chapter path -->
+    <div id="pathContainer"></div>
+    <div style="height:.75rem;"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  QUIZ SCREEN
+══════════════════════════════════ -->
+<div class="screen hidden" id="s-quiz">
+  <div class="hdr">
+    <button class="btn btg" style="padding:.43rem .68rem;font-size:.78rem;" onclick="goHome()">← Back</button>
+    <div style="flex:1;margin:0 .72rem;">
+      <div style="display:flex;justify-content:space-between;font-size:.63rem;color:var(--t2);margin-bottom:.26rem;">
+        <span id="quizChapterTitle">Chapter</span>
+        <span>Q<span id="qNum">1</span>/<span id="qTotal">6</span></span>
+      </div>
+      <div class="xpt"><div class="xpf" id="quizProgress" style="width:0%;"></div></div>
+    </div>
+    <div class="hearts" id="quizHearts" style="gap:.13rem;">
+      <span class="heart" style="font-size:.8rem;">❤️</span>
+      <span class="heart" style="font-size:.8rem;">❤️</span>
+      <span class="heart" style="font-size:.8rem;">❤️</span>
+      <span class="heart" style="font-size:.8rem;">❤️</span>
+      <span class="heart" style="font-size:.8rem;">❤️</span>
+    </div>
+  </div>
+  <div class="sb">
+    <div style="padding:.9rem 1.2rem 0;" id="quiz-area"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  DAILY SCREEN
+══════════════════════════════════ -->
+<div class="screen hidden" id="s-daily">
+  <div class="hdr">
+    <button class="btn btg" style="padding:.43rem .68rem;font-size:.78rem;" onclick="goHome()">← Back</button>
+    <div class="disp" style="font-size:1.5rem;color:var(--lime);">🔥 DAILY CHALLENGE</div>
+    <span id="daily-streak-pill" class="streak-pill">🔥 <span id="daily-streak-num">0</span></span>
+  </div>
+  <div class="sb">
+    <div style="padding:.9rem 1.2rem 0;" id="daily-content"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  PRIZES / PACK SCREEN
+══════════════════════════════════ -->
+<div class="screen hidden" id="s-prizes">
+  <div class="hdr">
+    <div>
+      <div class="disp" style="font-size:1.45rem;background:linear-gradient(135deg,var(--gold),var(--plum));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">🎁 PRIZES</div>
+      <div class="hdr-sub">Score 3+ in games to win packs</div>
+    </div>
+    <div class="hearts" id="hearts-prize">
+      <span class="heart">❤️</span><span class="heart">❤️</span>
+      <span class="heart">❤️</span><span class="heart">❤️</span>
+      <span class="heart">❤️</span>
+    </div>
+  </div>
+  <div class="sb">
+    <div style="padding:.9rem 1.2rem 0;" id="prizes-content"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  COLLECTION SCREEN
+══════════════════════════════════ -->
+<div class="screen hidden" id="s-cards">
+  <div class="hdr">
+    <div>
+      <div class="disp" style="font-size:1.45rem;background:linear-gradient(135deg,var(--gold),var(--plum));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">🎴 COLLECTION</div>
+      <div class="hdr-sub">Win cards by scoring 3+ in games</div>
+    </div>
+    <span id="coll-count" class="pill pg">0 cards</span>
+  </div>
+  <div class="sb">
+    <div style="padding:.9rem 1.2rem 0;" id="coll-content"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  PROFILE SCREEN
+══════════════════════════════════ -->
+<div class="screen hidden" id="s-profile">
+  <div class="hdr">
+    <div class="disp" style="font-size:1.45rem;color:var(--lime);">⭐ MY PROFILE</div>
+    <span id="pro-pill" class="pill pg" style="display:none;">⭐ Pro</span>
+  </div>
+  <div class="sb">
+    <div id="profile-content"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  PRO SCREEN
+══════════════════════════════════ -->
+<div class="screen hidden" id="s-pro">
+  <div class="hdr">
+    <button class="btn btg" style="padding:.43rem .68rem;font-size:.78rem;" onclick="goHome()">← Back</button>
+    <div class="disp" style="font-size:1.5rem;background:linear-gradient(135deg,var(--gold),var(--amber));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">⭐ FOOTY BRAIN PRO</div>
+  </div>
+  <div class="sb">
+    <div style="padding:.9rem 1.2rem 0;" id="pro-content"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  SETTINGS SCREEN
+══════════════════════════════════ -->
+<div class="screen hidden" id="s-settings">
+  <div class="hdr">
+    <button class="btn btg" style="padding:.43rem .68rem;font-size:.78rem;" onclick="goHome()">← Back</button>
+    <div class="disp" style="font-size:1.5rem;">⚙️ SETTINGS</div>
+  </div>
+  <div class="sb">
+    <div style="padding:.9rem 1.2rem 0;" id="settings-content"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  FULL SCREEN LEVEL INTRO
+══════════════════════════════════ -->
+<div id="lvl-intro">
+  <div class="fsi-glow" id="fsi-glow"></div>
+  <button style="position:absolute;top:1rem;left:1.1rem;background:var(--s2);border:1px solid var(--b2);color:var(--t2);font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:600;padding:.4rem .85rem;border-radius:99px;cursor:pointer;z-index:10;-webkit-tap-highlight-color:transparent;" onclick="closeFSI()">← Path</button>
+  <div class="fsi-scroll">
+    <div class="fsi-hero">
+      <div id="fsi-first-badge" class="pill pl" style="margin-bottom:1rem;">✨ First time here</div>
+      <div class="fsi-emoji" id="fsi-emoji">⚽</div>
+      <div class="fsi-chapter" id="fsi-chapter">Chapter</div>
+      <div class="fsi-level" id="fsi-level-name">Level 1 — Kickabout</div>
+      <div class="fsi-quote" id="fsi-quote"></div>
+    </div>
+    <div class="fsi-body">
+      <div class="lbl">What you'll cover</div>
+      <div class="fsi-learns" id="fsi-learns"></div>
+      <div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-bottom:1.25rem;" id="fsi-meta"></div>
+      <button class="fsi-cta" id="fsi-cta" onclick="startFromFSI()">
+        <span id="fsi-cta-txt">I'm Ready →</span>
+        <span class="fsi-cta-shine"></span>
+      </button>
+      <div style="text-align:center;margin-top:.65rem;">
+        <button onclick="closeFSI()" style="background:none;border:none;color:var(--t2);font-family:'DM Sans',sans-serif;font-size:.8rem;cursor:pointer;padding:.3rem;">← Back to path</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  SLIDE-UP CARD INTRO (repeat)
+══════════════════════════════════ -->
+<div id="lvl-card" onclick="handleCardBackdrop(event)">
+  <div class="lc-backdrop"></div>
+  <div class="lc-sheet">
+    <div class="lc-drag"></div>
+    <div style="display:flex;align-items:center;gap:.9rem;padding:0 1.25rem .85rem;" id="lc-top"></div>
+    <div style="margin:0 1.25rem .85rem;padding:.75rem .9rem;background:var(--s1);border:1px solid var(--b1);border-radius:12px;font-style:italic;font-size:.84rem;line-height:1.55;color:var(--t2);" id="lc-quote"></div>
+    <div style="margin:0 1.25rem .85rem;" id="lc-learns"></div>
+    <div style="display:flex;gap:.45rem;padding:0 1.25rem .85rem;flex-wrap:wrap;" id="lc-meta"></div>
+    <div style="padding:0 1.25rem 1.5rem;">
+      <button class="btn" id="lc-start" style="width:100%;margin-bottom:.5rem;color:#000;" onclick="startFromCard()"></button>
+      <div style="display:flex;gap:.5rem;">
+        <button class="btn btg" style="flex:1;font-size:.8rem;" onclick="closeCard()">← Back</button>
+        <button class="btn btg" style="flex:1;font-size:.8rem;" onclick="showAllLevels()">All Levels</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  HEARTS EMPTY MODAL
+══════════════════════════════════ -->
+<div class="modal" id="m-hearts">
+  <div class="modal-box" style="text-align:center;">
+    <div style="font-size:3rem;margin-bottom:.5rem;">💔</div>
+    <h2 class="disp" style="font-size:2rem;color:var(--rose);margin-bottom:.3rem;">OUT OF HEARTS</h2>
+    <p style="color:var(--t2);font-size:.82rem;line-height:1.6;margin-bottom:1.25rem;">You've used all your hearts!<br>Wait 30 minutes or go Pro for unlimited.</p>
+    <div style="background:rgba(255,94,138,.07);border:1px solid rgba(255,94,138,.2);border-radius:12px;padding:.85rem;margin-bottom:1rem;font-size:.8rem;">
+      <div style="font-weight:700;color:var(--rose);margin-bottom:.2rem;">⏱ Refills in</div>
+      <div class="disp" style="font-size:2rem;" id="hearts-timer">30:00</div>
+    </div>
+    <button class="btn bta" style="width:100%;margin-bottom:.5rem;" onclick="closeModal('m-hearts');showScreen('s-pro')">⭐ Go Pro — Unlimited Hearts</button>
+    <button class="btn btg" style="width:100%;font-size:.82rem;" onclick="closeModal('m-hearts')">Wait for refill</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  LEVEL UP MODAL
+══════════════════════════════════ -->
+<div class="modal" id="m-levelup">
+  <div class="modal-box" style="text-align:center;">
+    <div style="font-size:4rem;margin-bottom:.5rem;">🏆</div>
+    <h2 class="disp" style="font-size:2.8rem;background:linear-gradient(135deg,var(--lime),var(--sky));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:.2rem;">LEVEL UP!</h2>
+    <div class="disp" style="font-size:1.6rem;color:var(--amber);" id="lu-num">Level 2</div>
+    <div style="color:var(--t2);margin:.35rem 0 1.5rem;font-size:.85rem;" id="lu-title">Sunday League</div>
+    <button class="btn btl" style="width:100%;" onclick="closeModal('m-levelup')">Let's Go! 🔥</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  CHAPTER COMPLETE MODAL
+══════════════════════════════════ -->
+<div class="modal" id="m-chapter-done">
+  <div class="modal-box" style="text-align:center;" id="m-chapter-done-box"></div>
+</div>
+
+<!-- ══════════════════════════════════
+  BOTTOM NAV
+══════════════════════════════════ -->
+<nav id="main-nav" class="hidden">
+  <div class="nav-row">
+    <button class="nb on" id="nb-path" onclick="showScreen('s-path');setNav('nb-path')">
+      <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>PATH
+    </button>
+    <button class="nb" id="nb-daily" onclick="showScreen('s-daily');setNav('nb-daily')">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>DAILY
+    </button>
+    <button class="nb" id="nb-prizes" onclick="showScreen('s-prizes');setNav('nb-prizes');renderPrizesScreen()">
+      <svg viewBox="0 0 24 24"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/></svg>PRIZES
+    </button>
+    <button class="nb" id="nb-cards" onclick="showScreen('s-cards');setNav('nb-cards');renderCollection()">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>CARDS
+    </button>
+    <button class="nb" id="nb-games" onclick="showScreen('s-games');setNav('nb-games');renderGamesScreen()">
+      <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>GAMES
+    </button>
+    <button class="nb" id="nb-me" onclick="showScreen('s-profile');setNav('nb-me');renderProfile()">
+      <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>ME
+    </button>
+  </div>
+</nav>
+
+
+<!-- ══════════════════════════════════
+  GAMES SCREEN
+══════════════════════════════════ -->
+<div class="screen hidden" id="s-games">
+  <div class="hdr">
+    <button class="btn btg" style="padding:.43rem .68rem;font-size:.78rem;" onclick="goHome()">← Back</button>
+    <div class="disp" style="font-size:1.45rem;color:var(--lime);">🕹️ ARCADE</div>
+    <span class="pill pg" style="font-size:.68rem;">Win cards</span>
+  </div>
+  <div class="sb">
+    <!-- Game selector -->
+    <div id="game-selector" style="padding:.9rem 1.2rem 0;">
+      <div style="font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t2);margin-bottom:.75rem;">Choose a Game</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;" id="game-grid"></div>
+    </div>
+    <!-- Active game container -->
+    <div id="game-active" style="display:none;padding:.9rem 1.2rem 0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;" id="gameTitle">Game</div>
+        <button onclick="closeGame()" style="background:var(--s2);border:1px solid var(--b2);color:var(--t2);font-family:'DM Sans',sans-serif;font-size:.78rem;font-weight:600;padding:.35rem .75rem;border-radius:99px;cursor:pointer;">✕ Exit</button>
+      </div>
+      <div id="game-container"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  DRILLS SCREEN
+══════════════════════════════════ -->
+<div class="screen hidden" id="s-drills">
+  <div class="hdr">
+    <button class="btn btg" style="padding:.43rem .68rem;font-size:.78rem;" onclick="goHome()">← Back</button>
+    <div class="disp" style="font-size:1.45rem;color:var(--amber);">🏃 DRILLS</div>
+  </div>
+  <div class="sb">
+    <div style="padding:.9rem 1.2rem 0;" id="drills-content"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  PACK MODAL (prize reveal)
+══════════════════════════════════ -->
+<div class="modal" id="pack-modal" style="z-index:500;">
+  <div class="modal-box" style="padding:0;overflow:hidden;max-width:340px;" id="pack-modal-content">
+    <div id="pack-closed-view" style="padding:2rem;text-align:center;">
+      <div style="font-size:4rem;margin-bottom:1rem;animation:artbob 1s ease-in-out infinite;">🎁</div>
+      <h2 class="disp" style="font-size:2rem;color:var(--amber);margin-bottom:.5rem;">PACK READY!</h2>
+      <p style="color:var(--t2);font-size:.85rem;margin-bottom:1.25rem;">You earned a prize pack!</p>
+      <button class="btn bta" style="width:100%;" onclick="revealPrize()">Open Pack ✨</button>
+      <button class="btn btg" style="width:100%;margin-top:.5rem;font-size:.8rem;" onclick="closeModal('pack-modal')">Later</button>
+    </div>
+    <div id="pack-opened-view" style="display:none;padding:2rem;text-align:center;">
+      <div id="prize-reveal-content"></div>
+      <button class="btn btl" style="width:100%;margin-top:1rem;" onclick="collectPrize()">Collect! 🎉</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /app -->
+
+
+<script>
+// Early helpers — needed by packs.js and games.js before app-main.js loads
+function el(id) { return document.getElementById(id); }
+function showModal(id) { var e=el(id); if(e) e.classList.add('on'); }
+function closeModal(id) { var e=el(id); if(e) e.classList.remove('on'); }
+</script>
+<script src="data.js"></script>
+<script src="data-batch2.js"></script>
+<script src="data-batch3.js"></script>
+<script src="data-positions.js"></script>
+<script src="data-positions-2.js"></script>
+<script src="data-career.js"></script>
+<script src="drills.js"></script>
+<script src="packs.js"></script>
+<script src="games.js"></script>
+<script src="penalty3d.js"></script>
+<script src="path.js"></script>
+<script src="app-v3.js"></script>
+
+<script src="data-sunday.js"></script>
+<script src="app-main.js"></script>
+</body>
+</html>
